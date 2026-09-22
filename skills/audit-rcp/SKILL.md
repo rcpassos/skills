@@ -4,88 +4,48 @@ description: Audit a local codebase or GitHub repo for hidden bugs, edge cases, 
 disable-model-invocation: true
 ---
 
-Perform a read-only full-project audit, not a diff review. Cover nine axes grouped into five passes: Correctness, Security, Architecture, Performance & Reliability, Maintenance. Run independent passes, then verify and triage their findings. Keep the audit read-only unless the user explicitly asks for fixes. The user's instructions take precedence over this workflow.
+Read-only full-project audit, not a diff review: five independent passes, then verify and triage into two lists. Stay read-only unless the user asks for fixes; their instructions override this workflow.
 
 ## Process
 
 ### 1. Resolve the target
 
-The user gives either a local path or a GitHub reference (URL, `owner/repo`, or issue-linked repo).
+- **Local path** — confirm it resolves; that directory is the audit root.
+- **GitHub reference** (URL, `owner/repo`) — `git clone --depth 31 <url>` into a `mktemp -d` directory (31 commits feed the hotspot window) and record `git rev-parse HEAD`. Never push or touch the remote.
+- Ambiguous between local and remote — ask.
 
-- Local path: confirm it resolves and list top-level entries. That directory is the audit root. Do not modify it.
-- GitHub: create an isolated temporary directory with `mktemp -d`, then clone into it with enough history for the 30-commit hotspot window (`git clone --depth 31 <url> <temp-dir>`). Record the full commit SHA with `git rev-parse HEAD`. Never push, open a PR, or modify the remote.
-- If the target is ambiguous, ask. Do not guess between local and remote.
+### 2. Build the grounding map
 
-### 2. Ground before judging
+Skim once, then hand the map to every pass:
 
-Skim before spawning sub-agents (you do this once, then hand the map to them):
+- What the project claims to be and its conventions: `README.md`, `CONTEXT.md`, `AGENTS.md` / `CLAUDE.md`, `docs/adr/`.
+- Runtime and exact dependency versions from manifests and lockfiles.
+- Layout: entry points, layer boundaries, where auth, input, and secrets are handled.
+- Exclusions: generated, vendored, dependency, cache, and build output — unless the user includes them. Lockfiles and deploy config stay in.
+- Hotspots: files recurring in `git log -30 --name-only --format=`. Churn prioritises reading; it is not evidence.
+- Safety net: tests, lint/format config, CI.
+- Constraints that block verification: missing deps, credentials, network, runtimes.
 
-- Entry docs: `README.md`, `CONTEXT.md`, `AGENTS.md` / `CLAUDE.md`, `docs/adr/` — what the project says it is and the conventions it claims.
-- Manifests and lockfiles: `package.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`, `Gemfile`, `*.csproj`, and ecosystem lockfiles — runtime version, exact dependency versions, and available scripts.
-- Layout: entry points, transport/UI vs domain vs data layers, where auth/input/secret handling lives.
-- Inventory and exclusions: identify first-party source and configuration. Exclude generated files, vendored code, dependency directories, caches, and build output unless the user explicitly includes them. Still inspect lockfiles and deployment configuration.
-- Hot spots: for a repo with sufficient history, use `git log -30 --name-only --format=` and aggregate repeatedly changed files. Use churn only to prioritize inspection; it is not evidence of a defect.
-- Existing safety net: test dirs, lint/format config, CI workflow. Treat missing coverage as an audit limitation unless it creates a concrete, evidenced risk.
-- Audit constraints: record unavailable dependencies, missing credentials, disabled network access, unsupported runtimes, or other limits that prevent verification.
+### 3. Run the five passes
 
-Pass the audit root + this map to every sub-agent. Each sub-agent reads the surrounding file and callers of anything it flags — findings that only show up outside the flagged hunk are the norm.
+One sub-agent per pass, in parallel as capacity allows. Each gets the audit root, the map, the exclusions, and its checklist verbatim, and is told: "Report only your strongest evidence-backed leads — each with a one-line claim, `file:line`, the concrete failure, and evidence or a reproduction. Read the surrounding code and callers before reporting."
 
-### 3. Run the five independent passes
+- **Correctness** — hidden bugs the happy path and tests miss; edge cases (empty/huge input, falsy values, boundaries, unicode, timezones, repeat/concurrent calls, partial failure); assumptions the system doesn't guarantee (nullability, ordering, uniqueness, freshness, unchecked casts, invariants enforced at only some call sites).
+- **Security** — untrusted input reaching a query, command, path, template, or deserializer; missing authn/authz, especially object-level; secrets or PII in code, logs, or responses; weak crypto or randomness, open redirects, missing rate limits. Report a secret by location, type, and redacted fingerprint — never its value. A dependency CVE counts only after confirming the locked version and dependency path against an audit tool or current advisory.
+- **Architecture** — code that fights the codebase's shape (layer leaks, new coupling or cycles, drifting duplicated state, an invented pattern where one exists); compat breaks for callers or stored data.
+- **Performance & reliability** — N+1, missing indexes, unbounded queries, heavy request-path work, memory growth — only where realistic volume makes it concrete; external calls without timeouts, unsafe retries, silent failures, overlapping or silently-stopped jobs, prod-only config breaks, non-atomic multi-store writes.
+- **Maintenance** — EOL runtimes, deprecated APIs, confirmed-unmaintained deps, dead flags and unreachable code (verify time-sensitive claims against current docs); behaviour-preserving simplifications with a concrete payoff. A documented repo convention suppresses the finding.
 
-Use the available collaboration tools and respect their current concurrency limit. Run passes in parallel when capacity allows; otherwise assign one pass to the primary agent or queue the remaining pass. Do not invent an agent or tool type that the runtime does not provide.
+### 4. Verify every finding
 
-Give each worker the audit root, grounding map, exclusions, and its checklist verbatim. Brief each: "Report only the strongest evidence-backed leads. For each: one-line claim, `file:line`, concrete failure, and supporting evidence or reproduction. Read surrounding code and callers before reporting it."
+Pool the passes, merge duplicates, and classify each against the actual code with the `validate-finding` skill. Where safe, confirm with a targeted test, build, static analysis, or minimal repro — record the command and result, and separate pre-existing failures from the suspected defect. Never run write-mode formatters. A security finding can instead be proven by a complete source-to-sink trace when running the exploit is unsafe.
 
-**Correctness**
+`bug` and `recommendation` survive. Drop false positives, anything tooling already enforces, and taste with no defensible cost. A `possible issue` is not a survivor.
 
-- **Hidden bugs** — logic wrong in a way tests and happy path don't reveal: off-by-one, inverted condition, wrong variable, mutation of shared state, unawaited promise, swallowed error, resource never released, race between concurrent paths.
-- **Edge cases** — empty, single-element, very large inputs; `null`/`undefined`/`NaN`/`0`/`""` where truthiness is tested; boundary values; duplicates; unicode; timezones and DST; concurrent or repeated calls (idempotent?); partial failure and retry; network timeout; pagination limits.
-- **Incorrect assumptions** — what code takes for granted the system doesn't guarantee: optional/nullable field treated as present, ordering not guaranteed, uniqueness not enforced, call that can fail or return partial data, cache/clock assumed fresh, type or non-null assertion over unverified shape, invariant enforced at one call site but not others.
+### 5. Report
 
-**Security**
+**Take it** — survivors worth fixing now, worst first. Each: one-line claim, `file:line`, the failure it causes, evidence, fix.
 
-- Untrusted input reaching query, command, path, template, or deserializer without validation (injection, path traversal, SSRF).
-- Missing/wrong authn/authz on endpoint, handler, or resource — especially object-level checks (can user A pass user B's id?).
-- Secrets, tokens, PII in code, logs, error messages, client-visible responses. Never reproduce a secret or personal value in output; report only its location, type, and a redacted fingerprint when needed to distinguish occurrences.
-- Weak or hand-rolled crypto, security-purpose randomness, unsafe redirects, missing rate limiting on expensive/auth-adjacent paths.
-- Dependencies: known-vulnerable, deprecated, or unmaintained packages. Treat unfamiliar packages only as investigation leads. Before reporting, establish the installed or locked version and dependency path, then confirm the claim with an ecosystem audit tool or a current authoritative advisory. If current evidence is unavailable, do not present the claim as a finding.
+**Leave it** — minor, YAGNI, or low-payoff. One line each with why it can wait.
 
-**Architecture**
-
-- Business logic leaking into transport/UI layer, inner layer importing outer one, new cross-module coupling or cycle, state duplicated in two places that can drift, leaky abstraction, boundary the codebase keeps closed being crossed, invented pattern when repo already has one.
-- Migration, backward-compat, data-shape breaks for existing callers or stored data.
-
-**Performance & Reliability**
-
-- **Performance** — N+1 queries, missing indexes on filtered/joined/sorted columns, unbounded queries or result sets, slow loops over large data, heavy work on the request path that belongs in a background job, missing or incorrect caching, memory growth (leaks, loading whole files or tables into memory). Report only what realistic data volume or traffic makes concrete: cite the query, loop, or path, and measure when you can.
-- **Reliability & operations** — external calls without timeouts; retries that are missing, unbounded, or not idempotent; errors swallowed without logging; logs missing the context needed to debug (or leaking secrets/PII); queue, cron, and scheduler jobs that can overlap, double-run, or stop silently; environment-specific configuration that breaks in production; writes across multiple stores with no consistency guarantee.
-
-**Maintenance — deprecated + simplifiable**
-
-- **Deprecated code** — EOL runtime in manifests/Docker/CI; deprecated stdlib/framework APIs; dependencies confirmed unmaintained or covered by a published advisory; pinned versions far behind upstream with a concrete migration cost; dead feature flags, commented-out blocks, unreachable code guarding removed callers. Verify time-sensitive claims against current authoritative documentation.
-- **Code improvements** — code that can be simplified without behaviour change: duplicated logic shape (extract and call twice); mysterious name hiding intent (rename, or design is murky); primitive standing in for a domain concept (small type); repeated switch on same type (polymorphism or shared map); middle-man that only delegates (cut it); speculative generality with no caller (delete it). Repo convention overrides — where docs endorse it, suppress the finding.
-
-### 4. Double-check every finding
-
-Pool all five passes, then confirm each against the actual code, classifying it with the `validate-finding` skill's rubric and evidence standards: `bug` and `recommendation` can survive (step 5 sorts them); `false-positive` is dropped; `possible issue` is an unverified lead. When safe and relevant, run a targeted test, existing test/build/static-analysis command, or minimal reproduction. Do not use write-mode formatters or mutate the target. Record the command and result used for confirmation, and distinguish pre-existing suite failures from failures caused by the suspected defect. A security finding may instead be verified through a complete, concrete source-to-sink analysis when executing an exploit would be unsafe.
-
-Drop anything where:
-
-- the code doesn't do what the finding claims (misread, missing guard/validation/type/test elsewhere);
-- tooling already enforces or auto-fixes it (formatter, linter, compiler);
-- it's a restatement of another finding — merge duplicates into one;
-- it's taste with no defensible cost.
-
-An unverified lead is not a survivor. Do not place it in **Take it** or **Leave it**. Mention it only as an audit limitation after the verdict counts when the missing verification materially affects confidence.
-
-### 5. Report two lists
-
-Present only survivors, in exactly two sections:
-
-**Take it** — verified bugs, correctness, security, data-loss, breakers, architectural problems worth fixing now, performance or reliability problems with concrete impact, deprecated code with confirmed EOL/CVE/migration cost, and simplifications with concrete payoff. Order worst first. Each: one-line claim, `file:line`, concrete failure it causes, evidence, and fix.
-
-**Leave it** — minor improvements, style nits, YAGNI, harmless dead code, low-payoff simplifications. One line each, plus why not worth doing now.
-
-End with one line: counts per list, plus how many dropped as false positives. If verification was materially constrained, append one concise audit-limitations sentence without turning unverified leads into findings.
-
-Do not pad either list. An empty **Take it** is a fine outcome — state it plainly.
+End with one line: counts per list and false positives dropped. If verification was materially constrained, add one sentence on audit limitations. An empty **Take it** is a fine outcome — state it plainly.

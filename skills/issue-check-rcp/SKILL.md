@@ -4,93 +4,55 @@ description: Validate a GitHub issue before anyone starts work on it — is the 
 disable-model-invocation: true
 ---
 
-Answer four questions about one issue, in this order: **is it valid**, **is it useful**, **what's the risk**, **how big is it**. Every answer is grounded in the repo — read the code before judging.
-
-This skill does not implement anything and does not open a PR. Its output is a verdict.
+Answer four questions about one issue, in order: **valid**, **useful**, **risk**, **size**. Every answer is grounded in the repo — read the code before judging. The output is a verdict; implement nothing and open no PR.
 
 ## Process
 
 ### 1. Fetch the issue
 
-Take the issue reference the user gave (URL, `#123`, or `owner/repo#123`).
+`gh issue view <ref> --comments` (or the workflow in `docs/agents/issue-tracker.md` if present). Read the whole thread — the real requirement and the "actually we decided X" often live in the comments. Note linked issues and PRs, labels, milestone. If it can't be fetched, ask for the text.
 
-- Prefer `gh issue view <ref> --comments` (or the workflow in `docs/agents/issue-tracker.md` if the repo documents one).
-- Read the **whole thread**, not just the opening post — the real requirement, the objections, and the "actually we decided X" often live in the comments.
-- Note linked issues and PRs, labels, milestone, and who's asking.
-
-If the issue can't be fetched, say so and ask for the text rather than guessing.
-
-Restate the issue in two or three sentences of your own words: **what is being asked for, and why**. If you can't do that from what's written, that's the first finding — record it and keep going.
+Restate what is asked and why in two or three sentences. If you can't, that is the first finding.
 
 ### 2. Ground it in the codebase
 
-Find the code the issue is actually about before judging any of it. Look for:
+Cite `file:line` for every assertion; use sub-agents on a large repo. Establish:
 
-- The area that would change, and the files most likely to be touched.
-- Whether the problem **still exists** — for a bug, trace the code path or write a quick check; the fix may already be in, or the code may have moved.
-- Whether it's **already solved elsewhere**, partly done, or duplicated by another issue or an open PR.
-- The blast radius: callers of anything that would change, public API/schema/config surface, stored data shape, other teams' or clients' dependence on current behaviour.
-- What the codebase's own conventions say about how this kind of thing gets built here.
-- Tests that cover this area today — their absence is a risk, not a saving.
-
-Use sub-agents for the search when the repo is large; cite `file:line` for anything you assert.
+- The code that would change.
+- Whether the problem still exists — trace the path or run a quick check; it may already be fixed, or the code moved.
+- Whether it's already solved, partly done, or duplicated by another issue or open PR.
+- Blast radius: callers, public API/schema/config, stored data, external consumers.
+- Existing tests for the area — their absence is a risk.
 
 ### 3. Validity
 
-Is this a well-formed, real, actionable issue? Judge:
+Judge whether it is real, has a clear "done" (propose acceptance criteria if missing), is one right-sized problem rather than a pre-committed solution, and what it assumes that the code doesn't support. List every open question, marking which block work.
 
-- **Real** — the problem reproduces, or the need is genuine; not already fixed, not a misunderstanding of how the feature works.
-- **Clear** — a reader can tell what "done" means. Are there acceptance criteria? If not, propose them.
-- **Right-shaped** — one issue, not five smuggled into one; a problem statement rather than a pre-committed solution; scoped to something a person can finish.
-- **Unambiguous** — list every question that must be answered before work starts, and mark which are blocking.
-- **Assumptions** — name what the issue takes for granted that the code doesn't support.
-
-Verdict: **Valid** / **Valid with changes** (say exactly which) / **Invalid** (say why — duplicate, already fixed, works as designed, out of scope).
+Verdict: **Valid** / **Valid with changes** (say which) / **Invalid** (duplicate, already fixed, works as designed, out of scope).
 
 ### 4. Usefulness
 
-Is it worth doing at all?
+Who it helps and how often, the cost of not doing it, whether it serves a stated project goal, and cheaper alternatives (docs, config, a smaller fix, declining).
 
-- Who benefits, how many of them, and how often does this bite?
-- What is the cost of _not_ doing it — workaround exists, or people are blocked?
-- Does it move something the project already says it cares about, or is it a drive-by preference?
-- Cheaper alternatives: docs, config, a smaller fix, or declining it.
-
-Verdict: **Worth doing now** / **Worth doing later** / **Not worth doing** — with the one-line reason.
+Verdict: **Worth doing now** / **Worth doing later** / **Not worth doing**, with a one-line reason.
 
 ### 5. Risk
 
-What could go wrong if this is built as described? Cover, and skip what doesn't apply:
+Weigh breaking changes and migrations, blast radius and reversibility, security and data exposure, correctness hazards, unknowns, and test coverage.
 
-- **Breaking change** — API, schema, config, CLI, stored data, or behaviour existing users rely on. Migration needed?
-- **Blast radius** — how many call sites, modules, or services move; how reversible the change is.
-- **Security & data** — new untrusted input, new authz surface, PII, secrets, anything touching auth or payments.
-- **Correctness hazards** — concurrency, ordering, idempotency, partial failure, performance at real data volume.
-- **Unknowns** — parts nobody can size yet, external dependencies, decisions the issue leaves open.
-- **Test coverage** — is there a safety net here, or would this be built blind?
-
-Give an overall **Low / Medium / High**, name the single biggest risk, and say what would lower it (a spike, a feature flag, splitting the issue, a decision from a named person).
+Verdict: **Low** / **Medium** / **High**, the single biggest risk, and what would lower it (a spike, a flag, a split, a decision from a named person).
 
 ### 6. Size
 
-A **rough time range** for one competent engineer already familiar with the repo — e.g. "half a day to two days", "3–5 days". Always a range, never a single number.
-
-State it with:
-
-- The assumptions it rests on, and what would blow it up (the range is only as good as these).
-- The work included: implementation, tests, migration, docs, review, rollout.
-- Where the uncertainty is concentrated.
-- If the range spans more than ~4×, say the issue is too unclear to size and name what must be decided first.
+A time range for one competent engineer familiar with the repo — always a range, never a single number. Include implementation, tests, migration, docs, review, and rollout. State the assumptions, what would blow it up, and where the uncertainty sits. A range wider than ~4× means the issue is too unclear to size — name what must be decided first.
 
 ### 7. Report
 
-Short and skimmable, in this order:
-
-1. **One-line verdict** — e.g. "Valid and worth doing; medium risk; 2–4 days" — then the restatement from step 1.
-2. **Validity** — verdict, then blocking questions as a list.
+1. **One-line verdict** — e.g. "Valid and worth doing; medium risk; 2–4 days" — then the restatement.
+2. **Validity** — verdict, then blocking questions.
 3. **Usefulness** — verdict and reason.
 4. **Risk** — level, biggest risk, mitigations.
 5. **Size** — range, assumptions, what would blow it up.
-6. **Before starting** — the concrete next actions: decisions to get, acceptance criteria to add, how to split it if it should be split.
+6. **Before starting** — decisions to get, acceptance criteria to add, how to split it.
 
-Be direct. "This issue is already fixed in `x.ts:112`, close it" is a better answer than a balanced essay. If the honest answer is "can't tell yet", say that and name exactly what is missing.
+Be direct: "Already fixed in `x.ts:112`, close it" beats a balanced essay. If the honest answer is "can't tell yet", say so and name what's missing.
