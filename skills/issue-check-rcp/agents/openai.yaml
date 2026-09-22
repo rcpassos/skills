@@ -1,0 +1,5 @@
+interface:
+  display_name: "Issue Check (RCP)"
+  short_description: "Validate an issue: valid, useful, risk, size"
+policy:
+  allow_implicit_invocation: false

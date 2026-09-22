@@ -1,0 +1,5 @@
+interface:
+  display_name: "Code Review (RCP)"
+  short_description: "Two-axis review, triaged into Take it / Leave it"
+policy:
+  allow_implicit_invocation: false
