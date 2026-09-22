@@ -1,0 +1,4 @@
+interface:
+  display_name: "Validate Finding"
+  short_description: "Classify findings by evidence and impact"
+  default_prompt: "Use $validate-finding to validate this suspected issue and classify it as a bug, possible issue, false-positive, or recommendation."
