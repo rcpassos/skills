@@ -4,7 +4,11 @@ description: Audit a local codebase or GitHub repo for hidden bugs, edge cases, 
 disable-model-invocation: true
 ---
 
-Read-only full-project audit, not a diff review: five independent passes, then verify and triage into two lists. Stay read-only unless the user asks for fixes; their instructions override this workflow.
+Read-only full-project audit, not a diff review: five independent passes, then verify and report only what clears the bar. Stay read-only unless the user asks for fixes; their instructions override this workflow.
+
+## The bar
+
+A finding has a concrete cost: a bug, a security or data-loss issue, a reliability or performance failure at realistic load, or a maintainability cost — code that makes future change harder or riskier (duplicated logic that will drift, coupling across layers, deprecated or EOL dependencies, a risky path without tests, a simplification with a concrete payoff). Style, nits, YAGNI, and taste fall below it; below-bar findings go unreported and uncounted.
 
 ## Process
 
@@ -28,7 +32,7 @@ Skim once, then hand the map to every pass:
 
 ### 3. Run the five passes
 
-One sub-agent per pass, in parallel as capacity allows. Each gets the audit root, the map, the exclusions, and its checklist verbatim, and is told: "Report only your strongest evidence-backed leads — each with a one-line claim, `file:line`, the concrete failure, and evidence or a reproduction. Read the surrounding code and callers before reporting."
+One sub-agent per pass, in parallel as capacity allows. Each gets the audit root, the map, the exclusions, its checklist, and the bar verbatim, and is told: "Report only evidence-backed leads that clear the bar — each with a one-line claim, `file:line`, the concrete failure, and evidence or a reproduction. Read the surrounding code and callers before reporting."
 
 - **Correctness** — hidden bugs the happy path and tests miss; edge cases (empty/huge input, falsy values, boundaries, unicode, timezones, repeat/concurrent calls, partial failure); assumptions the system doesn't guarantee (nullability, ordering, uniqueness, freshness, unchecked casts, invariants enforced at only some call sites).
 - **Security** — untrusted input reaching a query, command, path, template, or deserializer; missing authn/authz, especially object-level; secrets or PII in code, logs, or responses; weak crypto or randomness, open redirects, missing rate limits. Report a secret by location, type, and redacted fingerprint — never its value. A dependency CVE counts only after confirming the locked version and dependency path against an audit tool or current advisory.
@@ -40,12 +44,10 @@ One sub-agent per pass, in parallel as capacity allows. Each gets the audit root
 
 Pool the passes, merge duplicates, and classify each against the actual code with the `validate-finding` skill. Where safe, confirm with a targeted test, build, static analysis, or minimal repro — record the command and result, and separate pre-existing failures from the suspected defect. Never run write-mode formatters. A security finding can instead be proven by a complete source-to-sink trace when running the exploit is unsafe.
 
-`bug` and `recommendation` survive. Drop false positives, anything tooling already enforces, and taste with no defensible cost. A `possible issue` is not a survivor.
+`bug` and `recommendation` survive. Drop false positives, anything tooling already enforces, and anything below the bar. A `possible issue` is not a survivor.
 
 ### 5. Report
 
-**Take it** — survivors worth fixing now, worst first. Each: one-line claim, `file:line`, the failure it causes, evidence, fix.
+One list, worst first. Tag each **Fix now** (bugs, security and data-loss issues, reliability failures) or **Should fix** (maintainability cost). Each: one-line claim, `file:line`, the failure or cost it causes, evidence, fix.
 
-**Leave it** — minor, YAGNI, or low-payoff. One line each with why it can wait.
-
-End with one line: counts per list and false positives dropped. If verification was materially constrained, add one sentence on audit limitations. An empty **Take it** is a fine outcome — state it plainly.
+End with one line: counts per tag and false positives dropped. If verification was materially constrained, add one sentence on audit limitations. An empty list is a fine outcome — state it plainly.
