@@ -5,7 +5,7 @@ Agent skills for Claude Code, Codex, and other [skills](https://skills.sh)-compa
 | Skill | What it does |
 | --- | --- |
 | [`audit-rcp`](skills/audit-rcp/SKILL.md) | Read-only full-project audit of a local path or GitHub repo: bugs, security, architecture, performance, tech debt. Verified, prioritized findings. |
-| [`code-review-rcp`](skills/code-review-rcp/SKILL.md) | Three-axis review (Standards, Spec, Risk) of a PR, branch, or diff, verified and triaged into **Take it** / **Leave it**. |
+| [`code-review-rcp`](skills/code-review-rcp/SKILL.md) | Verified review of a PR, branch, or diff across Standards, Spec, and Risk, with severity, saved decisions, and follow-up checks of fixes. |
 | [`issue-check-rcp`](skills/issue-check-rcp/SKILL.md) | Validate a GitHub issue before work starts: is it valid, is it useful, what's the risk, how big is it. |
 | [`validate-finding`](skills/validate-finding/SKILL.md) | Classify a suspected issue as bug, possible issue, false-positive, or recommendation, backed by evidence. Used by `audit-rcp` and `code-review-rcp` to verify findings; also usable on its own. |
 

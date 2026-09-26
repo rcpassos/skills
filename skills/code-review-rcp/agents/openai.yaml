@@ -1,5 +1,5 @@
 interface:
   display_name: "Code Review (RCP)"
-  short_description: "Three-axis review: bugs, spec gaps, maintainability"
+  short_description: "Verified code reviews and follow-up checks of fixes"
 policy:
   allow_implicit_invocation: false
