@@ -1,0 +1,5 @@
+interface:
+  display_name: "WP Implement (RCP)"
+  short_description: "Implement and verify one phase of a WordPress plan"
+policy:
+  allow_implicit_invocation: false
