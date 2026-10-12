@@ -1,0 +1,5 @@
+interface:
+  display_name: "WP Plan (RCP)"
+  short_description: "Plan a WordPress build from Figma into phases"
+policy:
+  allow_implicit_invocation: false
