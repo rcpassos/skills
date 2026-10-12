@@ -20,6 +20,12 @@ Skills are grouped by category under `skills/<category>/<name>/`.
 | [`wp-plan-rcp`](skills/wordpress/wp-plan-rcp/SKILL.md) | Plan a WordPress site build from Figma via the Figma and Novamira MCPs: clarifying questions, a phased `docs/plan.md`, and `AGENTS.md` plus supporting docs for implementers. |
 | [`wp-implement-rcp`](skills/wordpress/wp-implement-rcp/SKILL.md) | Implement one phase of a `wp-plan-rcp` plan on the site, verify it against Figma, and write the handoff for the next session. |
 
+### Laravel
+
+| Skill | What it does |
+| --- | --- |
+| [`laravel-setup-rcp`](skills/laravel/laravel-setup-rcp/SKILL.md) | Configure a fresh `laravel new` project to house standards: Filament backoffice, Pint/Rector/PHPStan/Pest, Boost with house rules, Sanctum and Scramble for APIs. |
+
 ## Install
 
 ```bash

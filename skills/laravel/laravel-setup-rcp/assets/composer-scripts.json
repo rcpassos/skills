@@ -1,0 +1,15 @@
+{
+  "scripts": {
+    "lint": ["rector", "pint --parallel"],
+    "lint:check": ["pint --parallel --test", "rector --dry-run"],
+    "ci:check": ["Composer\\Config::disableProcessTimeout", "@test"],
+    "types:check": ["phpstan analyse"],
+    "test:unit": "pest --parallel",
+    "test": [
+      "@php artisan config:clear --ansi",
+      "@lint:check",
+      "@types:check",
+      "@test:unit"
+    ]
+  }
+}

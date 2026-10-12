@@ -4,7 +4,7 @@ Personal agent skills, shared by Claude Code and Codex. No build, no tests — a
 
 ## Layout
 
-Each skill lives in `skills/<category>/<name>/` (`general`, `wordpress`, …); a new category is a new folder plus a matching section in `README.md`. A skill holds:
+Each skill lives in `skills/<category>/<name>/` (`general`, `laravel`, `wordpress`, …); a new category is a new folder plus a matching section in `README.md`. A skill holds:
 
 - `SKILL.md` — frontmatter (`name`, `description`) plus the body the agent runs.
 - `agents/openai.yaml` — Codex metadata: `display_name`, `short_description`, optional `default_prompt`, `policy`.
