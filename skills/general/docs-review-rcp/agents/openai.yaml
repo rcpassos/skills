@@ -1,0 +1,5 @@
+interface:
+  display_name: "Docs Review (RCP)"
+  short_description: "Review documentation, decisions, and rendered output"
+policy:
+  allow_implicit_invocation: false
