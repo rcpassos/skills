@@ -1,10 +1,10 @@
 ---
 name: audit-rcp
-description: Audit a local codebase or GitHub repo for hidden bugs, edge cases, incorrect assumptions, security holes, architectural problems, performance and reliability risks, deprecated code, and simplifiable code. Use when the user asks to audit, health-check, review a full project, harden a repo, or find tech debt. Do not use for reviewing changes in a PR, diff, branch, or commit; use a dedicated change-review skill instead.
+description: Audit a whole codebase or GitHub repo for bugs, security holes, architecture, performance and reliability risks, and maintenance debt. For a PR or diff, use code-review-rcp.
 disable-model-invocation: true
 ---
 
-Read-only full-project audit, not a diff review: five independent passes, then verify and report only what clears the bar. Stay read-only unless the user asks for fixes; their instructions override this workflow.
+Read-only full-project audit: map the repo, review it in slices, and report only verified findings that clear the bar. Stay read-only unless the user asks for fixes; their instructions override this workflow.
 
 ## The bar
 
@@ -14,40 +14,47 @@ A finding has a concrete cost: a bug, a security or data-loss issue, a reliabili
 
 ### 1. Resolve the target
 
-- **Local path** — confirm it resolves; that directory is the audit root.
-- **GitHub reference** (URL, `owner/repo`) — `git clone --depth 31 <url>` into a `mktemp -d` directory (31 commits feed the hotspot window) and record `git rev-parse HEAD`. Never push or touch the remote.
-- Ambiguous between local and remote — ask.
+- **Local path**: confirm it resolves; that directory is the audit root.
+- **GitHub reference** (URL, `owner/repo`): `git clone --depth 31 <url>` into a `mktemp -d` directory (31 commits feed the hotspot window) and record `git rev-parse HEAD`. Never push or touch the remote.
+- Ambiguous between local and remote: ask.
 
-### 2. Build the grounding map
+### 2. Build the map
 
-Skim once, then hand the map to every pass:
+Skim once; the map drives slicing and goes into every brief:
 
-- What the project claims to be and its conventions: `README.md`, `CONTEXT.md`, `AGENTS.md` / `CLAUDE.md`, `docs/adr/`.
-- Runtime and exact dependency versions from manifests and lockfiles.
+- Purpose and conventions: `README.md`, `CONTEXT.md`, `AGENTS.md` / `CLAUDE.md`, `docs/adr/`.
+- Runtime and locked dependency versions.
 - Layout: entry points, layer boundaries, where auth, input, and secrets are handled.
-- Exclusions: generated, vendored, dependency, cache, and build output — unless the user includes them. Lockfiles and deploy config stay in.
+- Exclusions: generated, vendored, dependency, cache, and build output, unless the user includes them. Lockfiles and deploy config stay in.
 - Hotspots: files recurring in `git log -30 --name-only --format=`. Churn prioritises reading; it is not evidence.
-- Safety net: tests, lint/format config, CI.
-- Constraints that block verification: missing deps, credentials, network, runtimes.
+- Safety net and blockers: tests, lint/format config, CI; missing deps, credentials, network, or runtimes that block verification.
 
-### 3. Run the five passes
+### 3. Review in slices
 
-One sub-agent per pass, in parallel as capacity allows. Each gets the audit root, the map, the exclusions, its checklist, and the bar verbatim, and is told: "Report only evidence-backed leads that clear the bar — each with a one-line claim, `file:line`, the concrete failure, and evidence or a reproduction. Read the surrounding code and callers before reporting."
+Partition the in-scope code into slices by subsystem, each a cohesive area one reviewer can read thoroughly, so each file is read by one reviewer. Add a **repo-wide** slice for manifests, lockfiles, CI and deploy config, and cross-cutting auth or middleware. A repo small enough for one reviewer is reviewed inline with no sub-agents.
 
-- **Correctness** — hidden bugs the happy path and tests miss; edge cases (empty/huge input, falsy values, boundaries, unicode, timezones, repeat/concurrent calls, partial failure); assumptions the system doesn't guarantee (nullability, ordering, uniqueness, freshness, unchecked casts, invariants enforced at only some call sites).
-- **Security** — untrusted input reaching a query, command, path, template, or deserializer; missing authn/authz, especially object-level; secrets or PII in code, logs, or responses; weak crypto or randomness, open redirects, missing rate limits. Report a secret by location, type, and redacted fingerprint — never its value. A dependency CVE counts only after confirming the locked version and dependency path against an audit tool or current advisory.
-- **Architecture** — code that fights the codebase's shape (layer leaks, new coupling or cycles, drifting duplicated state, an invented pattern where one exists); compat breaks for callers or stored data.
-- **Performance & reliability** — N+1, missing indexes, unbounded queries, heavy request-path work, memory growth — only where realistic volume makes it concrete; external calls without timeouts, unsafe retries, silent failures, overlapping or silently-stopped jobs, prod-only config breaks, non-atomic multi-store writes.
-- **Maintenance** — EOL runtimes, deprecated APIs, confirmed-unmaintained deps, dead flags and unreachable code (verify time-sensitive claims against current docs); behaviour-preserving simplifications with a concrete payoff. A documented repo convention suppresses the finding.
+Dispatch one sub-agent per slice in parallel. Where the harness lets you choose, slice reviewers can run on a faster model; step 4 re-checks what matters most. Each brief carries the audit root, the map, its slice and exclusions, the bar, the passes, and step 4's verification rules verbatim, and ends: "Read entry points, trust boundaries, and hotspots first, then surrounding code and callers. Classify each candidate with the validate-finding skill and return only `bug` and `recommendation` findings that clear the bar, each with a one-line claim, `file:line`, the concrete failure or cost, evidence or a reproduction, and confidence. Also return coverage gaps and leads that cross into other slices."
 
-### 4. Verify every finding
+Every reviewer applies all five passes:
 
-Pool the passes, merge duplicates, and classify each against the actual code with the `validate-finding` skill. Where safe, confirm with a targeted test, build, static analysis, or minimal repro — record the command and result, and separate pre-existing failures from the suspected defect. Never run write-mode formatters. A security finding can instead be proven by a complete source-to-sink trace when running the exploit is unsafe.
+- **Correctness**: edge cases, assumptions the system doesn't guarantee, invariants enforced at only some call sites.
+- **Security**: untrusted input reaching a sink; missing authn/authz, especially object-level; secrets or PII, reported by location, type, and redacted fingerprint, never the value. A dependency CVE counts only after confirming the locked version and dependency path against an audit tool or current advisory.
+- **Architecture**: layer leaks, coupling or cycles, drifting duplicated state, an invented pattern where one exists, compat breaks for callers or stored data.
+- **Performance & reliability**, only where realistic volume makes it concrete: N+1, missing indexes, unbounded queries, heavy request-path work, memory growth; external calls without timeouts, unsafe retries, silent failures, overlapping or silently-stopped jobs, prod-only config breaks, non-atomic multi-store writes.
+- **Maintenance**: EOL runtimes, deprecated APIs, confirmed-unmaintained deps, dead flags and unreachable code (check time-sensitive claims against current docs); behaviour-preserving simplifications with a concrete payoff. A documented repo convention suppresses the finding.
 
-`bug` and `recommendation` survive. Drop false positives, anything tooling already enforces, and anything below the bar. A `possible issue` is not a survivor.
+Done when every slice returns findings or an explicit none, plus coverage gaps.
+
+### 4. Verify
+
+Merge duplicates across slices and chase cross-slice leads. Reviewers have already classified their findings; re-check yourself only **Fix now** candidates, low-confidence findings, and claims spanning slices.
+
+Where safe, confirm with a targeted test, build, static analysis, or minimal repro; record the command and result, and separate pre-existing failures from the suspected defect. Never run write-mode formatters. A security finding can instead rest on a complete source-to-sink trace when running the exploit is unsafe.
+
+`bug` and `recommendation` findings that clear the bar survive. Drop false positives and anything tooling already enforces; a `possible issue` is a coverage gap, not a finding.
 
 ### 5. Report
 
 One list, worst first. Tag each **Fix now** (bugs, security and data-loss issues, reliability failures) or **Should fix** (maintainability cost). Each: one-line claim, `file:line`, the failure or cost it causes, evidence, fix.
 
-End with one line: counts per tag and false positives dropped. If verification was materially constrained, add one sentence on audit limitations. An empty list is a fine outcome — state it plainly.
+End with one line: counts per tag and false positives dropped. If verification was materially constrained, add one sentence on audit limitations. An empty list is a fine outcome; state it plainly.
