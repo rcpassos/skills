@@ -1,25 +1,21 @@
 # Follow-up reviews
 
-Read the prior review record and verify its target identity and referenced revisions before narrowing scope. Treat its decisions as context; current code and contracts determine whether they still hold.
+Verify the prior record's target identity and revisions before narrowing scope. Its decisions are context; current code and contracts decide whether they still hold.
 
 ## Establish the delta
 
-Compare the previous reviewed head with the new pinned head using a two-endpoint diff. Retain the full current merge-base-to-head diff for context. Check whether the base, spec, or relevant standards changed too.
+Diff the previously reviewed head against the new pinned head; keep the full merge-base-to-head diff for context. Check whether the base, spec, or standards changed too.
 
-If history was rewritten, map the old and new changes using the recorded SHAs and surviving patches. When a dependable mapping is unavailable, perform an initial review and explain the scope expansion. A missing record likewise cannot support a claim that earlier findings were verified.
+If history was rewritten, map old to new changes through the recorded SHAs and surviving patches; without a dependable mapping, do an initial review and say why. An unchanged head still allows rerunning blocked checks or settling missing facts, not a new full review.
 
-An unchanged head still permits rerunning previously blocked checks or settling missing facts. It does not justify a new full review by itself.
+## Review fixes and affected behaviour
 
-## Review fixes and affected behavior
+Check every open finding, plus any resolved or rejected finding whose code, contract, or assumptions changed. For each claimed fix, trace the original failure through the affected callers, state transitions, and shared invariants; a changed line or new test alone doesn't prove resolution.
 
-Check every open finding and any resolved or rejected finding whose code, contract, or assumptions changed. For each claimed fix, trace the original failure and check the affected callers, state transitions, and shared invariants for regressions. A changed line or newly added test alone does not prove resolution.
+Review all new changes since the last pass, related to the fixes or not, per step 3 of the main skill (inline or sliced by size). Expand beyond the delta only when a changed shared contract or concrete evidence warrants it, and record why.
 
-Cover all new changes since the last review, including changes unrelated to the reported fixes. Use the Standards, Spec, and Risk axes where applicable to that delta; delegate independent scopes when useful. Expand to other code when a changed shared contract or concrete evidence warrants it, and record why. If a new bug emerges during this work, validate it even if it lies outside the original findings.
-
-Reuse a finding's ID for the same root cause, including an incomplete fix. Reopen resolved or rejected findings only when new evidence or changed assumptions defeats the recorded reason; state what changed. Respect deferred decisions while keeping their impact and any gate exception visible.
+Reuse a finding's ID for the same root cause, including an incomplete fix. Reopen a resolved or rejected finding only when new evidence defeats the recorded reason; say what changed. Deferred decisions stand, with their impact and any gate exception visible.
 
 ## Close the pass
 
-Apply the main skill's verification and completion rules. Record each finding's current status, newly demonstrated bugs, checks performed, scope expansions, and remaining gaps. If the same code and evidence leave the same unresolved finding, report it once as still open and name the needed action; repeating the search is not progress.
-
-Return to the main skill to report and save the record. Finish after this scoped pass; optional improvements alone do not trigger another review cycle.
+Return to steps 4–6 of the main skill. A finding left unchanged by the code and evidence is reported once as still open, with the action it needs. Optional improvements alone don't trigger another cycle.

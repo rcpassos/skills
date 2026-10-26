@@ -14,7 +14,7 @@ Check every open finding and any resolved or rejected finding whose code, contra
 
 When snapshots are available, compare the last audited snapshot with the current one, including uncommitted changes. Use that delta to identify fixes, regressions, and affected paths. By default, check earlier findings, their fixes, and affected behavior; follow the user's requested scope if they also ask to review all intervening changes. An unchanged snapshot still permits verifying findings or rerunning blocked checks.
 
-Delegate independent scoped checks when useful, with the relevant checklists from the main skill. Expand beyond the scope only for a changed shared contract, concrete evidence of a related failure, or a user request, and record why. Validate a concrete incidental discovery and report it separately from completion of the requested fix checks; it does not trigger another project-wide search.
+Run the scoped checks per step 3 of the main skill (inline, or sliced when they span several subsystems). Expand beyond the scope only for a changed shared contract, concrete evidence of a related failure, or a user request, and record why. Validate a concrete incidental discovery and report it separately from completion of the requested fix checks; it does not trigger another project-wide search.
 
 Reuse the same ID for the same root cause, including incomplete fixes. Reopen resolved or rejected claims only when new evidence or changed assumptions defeats the recorded reason; state what changed. Respect deferrals while keeping their unresolved impact visible. Done when each checked finding has a current disposition and evidence or a named verification gap.
 

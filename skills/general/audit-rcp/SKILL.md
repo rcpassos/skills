@@ -1,10 +1,10 @@
 ---
 name: audit-rcp
-description: Audit a local codebase or GitHub repo for bugs, security, architecture, performance, reliability, and maintenance costs; carry findings and decisions into scoped follow-up checks of fixes. For PR or diff reviews, use a dedicated change-review skill.
+description: Audit a local codebase or GitHub repo for bugs, security, architecture, performance, reliability, and maintenance costs; carry findings and decisions into scoped follow-up checks of fixes. For a PR or diff, use code-review-rcp.
 disable-model-invocation: true
 ---
 
-Initial audits run five independent full-project passes, then verify findings. Follow-ups check earlier findings, fixes, and affected behavior. Leave implementation unchanged unless the user asks for fixes; save only the audit record by default. The user's instructions override this workflow.
+Initial audits map the repo, review it in slices, and report only verified findings that clear the bar. Follow-ups check earlier findings, fixes, and affected behavior. Leave implementation unchanged unless the user asks for fixes; the only file you write is the audit record. The user's instructions override this workflow.
 
 ## The bar
 
@@ -14,56 +14,61 @@ A finding has a concrete cost: a bug, a security or data-loss issue, a reliabili
 
 ### 1. Resolve the target and choose the mode
 
-- **Local path** — confirm it resolves; that directory is the audit root.
-- **GitHub reference** (URL, `owner/repo`) — `git clone --depth 31 <url>` into a `mktemp -d` directory (31 commits feed the hotspot window) and record `git rev-parse HEAD`. Never push or touch the remote.
-- Ambiguous between local and remote — ask.
+- **Local path**: confirm it resolves; that directory is the audit root.
+- **GitHub reference** (URL, `owner/repo`): `git clone --depth 31 <url>` into a `mktemp -d` directory (31 commits feed the hotspot window) and record `git rev-parse HEAD`. Never push or touch the remote.
+- Ambiguous between local and remote: ask.
 
-Find prior findings and decisions in the current conversation, a user-supplied record, or `.scratch/audit/`. Match the repository and audited scope, not just a filename. **Initial audit** covers the full project. **Follow-up** applies when the user asks whether earlier findings are fixed or continues that audit; read [references/follow-up.md](references/follow-up.md). An explicit fresh audit runs the full passes while retaining earlier decisions as context.
+Find prior findings and decisions in the current conversation, a user-supplied record, or `.scratch/audit/`, matched by repository and audited scope. **Initial audit** covers the full project. **Follow-up** applies when the user asks whether earlier findings are fixed or continues that audit: read [references/follow-up.md](references/follow-up.md). An explicit fresh audit runs in full while keeping earlier decisions as context.
 
-Identify the current revision and working-tree changes; use a stable snapshot when changes are uncommitted, or record a content snapshot for a non-Git directory. Read and verify against that same snapshot. Done when the target, snapshot, mode, and covered scope are established.
+Pin the snapshot: the revision plus any uncommitted changes, or a content snapshot for a non-Git directory. Read and verify against it. Done when target, snapshot, mode, and covered scope are established.
 
-### 2. Build the grounding map
+### 2. Build the map
 
-For an initial audit, skim once, then hand the map to every pass. For a follow-up, refresh the parts needed for its scoped checks:
+For an initial audit, skim once; the map drives slicing and goes into every brief. A follow-up refreshes only what its checks need.
 
-- What the project claims to be and its conventions: `README.md`, `CONTEXT.md`, `AGENTS.md` / `CLAUDE.md`, `docs/adr/`.
-- Runtime and exact dependency versions from manifests and lockfiles.
+- Purpose and conventions: `README.md`, `CONTEXT.md`, `AGENTS.md` / `CLAUDE.md`, `docs/adr/`.
+- Runtime and locked dependency versions.
 - Layout: entry points, layer boundaries, where auth, input, and secrets are handled.
-- Exclusions: generated, vendored, dependency, cache, and build output — unless the user includes them. Lockfiles and deploy config stay in.
+- Exclusions: generated, vendored, dependency, cache, and build output, unless the user includes them. Lockfiles and deploy config stay in.
 - Hotspots: files recurring in `git log -30 --name-only --format=`. Churn prioritises reading; it is not evidence.
-- Safety net: tests, lint/format config, CI.
-- Constraints that block verification: missing deps, credentials, network, runtimes.
+- Safety net and blockers: tests, lint/format config, CI; missing deps, credentials, network, or runtimes that block verification.
 
-### 3. Run the scoped checks
+### 3. Review in slices
 
-For an initial audit, dispatch one sub-agent per pass, in parallel as capacity allows. For a follow-up, use the reference above to select scoped checks instead of rerunning all five passes. Each delegated check gets the audit root, snapshot, map, exclusions, prior decisions, assigned scope, relevant checklist, and the bar verbatim, and is told: "Report only evidence-backed leads that clear the bar — each with a one-line claim, `file:line`, the concrete failure, and evidence or a reproduction. Read the surrounding code and callers before reporting."
+Partition the in-scope code into slices by subsystem, each a cohesive area one reviewer can read thoroughly, so each file is read by one reviewer. Add a **repo-wide** slice for manifests, lockfiles, CI and deploy config, and cross-cutting auth or middleware. A repo small enough for one reviewer is reviewed inline with no sub-agents. A follow-up slices only its scoped checks.
 
-- **Correctness** — hidden bugs the happy path and tests miss; edge cases (empty/huge input, falsy values, boundaries, unicode, timezones, repeat/concurrent calls, partial failure); assumptions the system doesn't guarantee (nullability, ordering, uniqueness, freshness, unchecked casts, invariants enforced at only some call sites).
-- **Security** — untrusted input reaching a query, command, path, template, or deserializer; missing authn/authz, especially object-level; secrets or PII in code, logs, or responses; weak crypto or randomness, open redirects, missing rate limits. Report a secret by location, type, and redacted fingerprint — never its value. A dependency CVE counts only after confirming the locked version and dependency path against an audit tool or current advisory.
-- **Architecture** — code that fights the codebase's shape (layer leaks, new coupling or cycles, drifting duplicated state, an invented pattern where one exists); compat breaks for callers or stored data.
-- **Performance & reliability** — N+1, missing indexes, unbounded queries, heavy request-path work, memory growth — only where realistic volume makes it concrete; external calls without timeouts, unsafe retries, silent failures, overlapping or silently-stopped jobs, prod-only config breaks, non-atomic multi-store writes.
-- **Maintenance** — EOL runtimes, deprecated APIs, confirmed-unmaintained deps, dead flags and unreachable code (verify time-sensitive claims against current docs); behaviour-preserving simplifications with a concrete payoff. A documented repo convention suppresses the finding.
+Dispatch one sub-agent per slice in parallel. Where the harness lets you choose, slice reviewers can run on a faster model; step 4 re-checks what matters most. Each brief carries the audit root, snapshot, map, its slice and exclusions, prior decisions, the bar, the passes, and step 4's verification rules verbatim, and ends: "Read entry points, trust boundaries, and hotspots first, then surrounding code and callers. Classify each candidate with the validate-finding skill and return only `bug` and `recommendation` findings that clear the bar, each with a one-line claim, `file:line`, the concrete failure or cost, evidence or a reproduction, and confidence. Also return coverage gaps and leads that cross into other slices."
 
-### 4. Verify every finding
+Every reviewer applies all five passes:
 
-Pool the scoped checks or passes, merge duplicates by root cause, and classify each against the snapshot with [validate-finding](../validate-finding/SKILL.md). Where safe, confirm with a targeted test, build, static analysis, or minimal repro — record the command and result, and separate pre-existing failures from the suspected defect. Never run write-mode formatters. A security finding can instead be proven by a complete source-to-sink trace when running the exploit is unsafe.
+- **Correctness**: edge cases, assumptions the system doesn't guarantee, invariants enforced at only some call sites.
+- **Security**: untrusted input reaching a sink; missing authn/authz, especially object-level; secrets or PII, reported by location, type, and redacted fingerprint, never the value. A dependency CVE counts only after confirming the locked version and dependency path against an audit tool or current advisory.
+- **Architecture**: layer leaks, coupling or cycles, drifting duplicated state, an invented pattern where one exists, compat breaks for callers or stored data.
+- **Performance & reliability**, only where realistic volume makes it concrete: N+1, missing indexes, unbounded queries, heavy request-path work, memory growth; external calls without timeouts, unsafe retries, silent failures, overlapping or silently-stopped jobs, prod-only config breaks, non-atomic multi-store writes.
+- **Maintenance**: EOL runtimes, deprecated APIs, confirmed-unmaintained deps, dead flags and unreachable code (check time-sensitive claims against current docs); behaviour-preserving simplifications with a concrete payoff. A documented repo convention suppresses the finding.
 
-`bug` and `recommendation` survive. Drop false positives, anything tooling already enforces, and anything below the bar. A `possible issue` is not a survivor.
+Done when every slice returns findings or an explicit none, plus coverage gaps.
+
+### 4. Verify
+
+Merge duplicates by root cause and chase cross-slice leads. Reviewers have already classified their findings with [validate-finding](../validate-finding/SKILL.md); re-check yourself only **Fix now** candidates, low-confidence findings, and claims spanning slices, against the snapshot.
+
+Where safe, confirm with a targeted test, build, static analysis, or minimal repro; record the command and result, and separate pre-existing failures from the suspected defect. Never run write-mode formatters. A security finding can instead rest on a complete source-to-sink trace when running the exploit is unsafe.
+
+`bug` and `recommendation` findings that clear the bar survive. Drop false positives and anything tooling already enforces; a `possible issue` is a coverage gap, not a finding.
 
 ### 5. Report
 
-One list, worst first. Tag each **Fix now** (bugs, security and data-loss issues, reliability failures) or **Should fix** (maintainability cost). Each: stable ID (`A1`, `A2`, ...), one-line claim, `file:line`, the failure or cost it causes, evidence, fix. Follow-ups report status changes and new findings without repeating unchanged explanations; state whether the earlier findings are resolved, still open, deferred, rejected, or unverified.
+One list, worst first. Tag each **Fix now** (bugs, security and data-loss issues, reliability failures) or **Should fix** (maintainability cost). Each: stable ID (`A1`, `A2`, …), one-line claim, `file:line`, the failure or cost it causes, evidence, fix. Follow-ups report status changes and new findings only, stating whether each earlier finding is resolved, still open, deferred, rejected, or unverified.
 
-End with counts of open findings per tag and false positives dropped, plus any material coverage or verification limits. An empty list is a fine outcome — state it plainly. Finish after the scoped checks and verification; another broad search requires an explicit fresh audit or concrete evidence warranting a recorded scope expansion. A completed follow-up describes the checked scope and snapshot, not proof of a defect-free project.
+End with counts of open findings per tag and false positives dropped, plus any material coverage or verification limits. An empty list is a fine outcome; state it plainly. Stop after this scoped pass; another broad search needs an explicit fresh audit or concrete evidence for a recorded scope expansion.
 
 ### 6. Save the audit record
 
-Update the matching record, or create `.scratch/audit/<target>.md` using a filesystem-safe repository or scope identifier. Link it in the final report; keep it out of commits unless requested. If the user requires no writes, provide the record inline instead.
+Update the matching record or create `.scratch/audit/<target>.md` (filesystem-safe repository or scope id), link it in the report, and keep it out of commits. If the user forbids writes, give it inline. Keep it compact and current:
 
-Keep a compact current record containing:
+- Repository and scope identity, snapshot (including uncommitted changes), mode, exclusions, contracts, and relevant standards.
+- Findings with stable IDs (new IDs only for new root causes): root cause, classification, tag, location, evidence, status (open, resolved, rejected, deferred), and who decided and why for any acceptance or deferral.
+- Checks run and results, scope expansions, verification gaps, and the snapshot each resolution was verified against. An unverified claim stays open with the missing evidence named.
 
-- Repository and scope identity, snapshot or revision identity (including uncommitted changes), mode, exclusions, contracts, and relevant standards.
-- Stable finding IDs, root cause, classification, tag, location, evidence, and status: open, resolved, rejected, or deferred. Record the reason and who made any acceptance or deferral decision; assign new IDs only to new root causes.
-- Checks and results, scope expansions, verification gaps, and the snapshot against which each resolution was verified. An unverified claim stays open with the missing evidence named.
-
-Preserve enough resolved and rejected evidence to avoid reopening settled claims without cause; omit discarded nits. Done when the record matches the reported snapshot, statuses, and decisions.
+Keep enough resolved and rejected evidence that settled claims aren't reopened without cause; omit nits.

@@ -1,6 +1,6 @@
 ---
 name: validate-finding
-description: Validate suspected issues, bugs, code review findings, analyzer warnings, user reports, audit findings, or recommendations by checking evidence, reproduction, impact, and intent. Use when you need to decide whether a claim is a bug, possible issue, false-positive, or recommendation before reporting it, changing code, or creating follow-up work. Also the verification rubric for audit-rcp and code-review-rcp.
+description: Validate a suspected bug, review or audit finding, analyzer warning, or user report, classifying it as bug, possible issue, false-positive, or recommendation from evidence. Use before reporting, fixing, or filing a claim. Verification rubric for audit-rcp, code-review-rcp, and docs-review-rcp.
 ---
 
 # Validate Finding
