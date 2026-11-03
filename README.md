@@ -13,7 +13,7 @@ Skills are grouped by category under `skills/<category>/<name>/`.
 | [`docs-review-rcp`](skills/general/docs-review-rcp/SKILL.md) | Read-only documentation review: requirements, architecture, decisions, technical claims, Word fidelity, and diagrams. |
 | [`issue-check-rcp`](skills/general/issue-check-rcp/SKILL.md) | Validate a GitHub issue before work starts: is it valid, is it useful, what's the risk, how big is it. |
 | [`technical-docs-rcp`](skills/general/technical-docs-rcp/SKILL.md) | Write, revise, or validate technical documentation against the reader's goal and available sources. |
-| [`validate-finding`](skills/general/validate-finding/SKILL.md) | Classify a suspected issue as bug, possible issue, false-positive, or recommendation, backed by evidence. Used by `audit-rcp`, `code-review-rcp`, and `docs-review-rcp` to verify findings; also usable on its own. |
+| [`validate-finding`](skills/general/validate-finding/SKILL.md) | Classify a suspected issue as bug, possible issue, false-positive, or recommendation, backed by evidence. Used by `audit-rcp`, `code-review-rcp`, `docs-review-rcp`, and `technical-docs-rcp` to verify findings; also usable on its own. |
 
 ### WordPress
 
@@ -34,7 +34,7 @@ Skills are grouped by category under `skills/<category>/<name>/`.
 npx skills add rcpassos/skills
 ```
 
-Install one skill with `--skill <name>`; list them first with `--list`; install for your user instead of the project with `-g`. When picking with `--skill`, include `validate-finding` alongside `audit-rcp`, `code-review-rcp`, or `docs-review-rcp`.
+Use `--list` to see available skills, `--skill <name>` to select a skill, and `-g` to install for your user. When selecting `audit-rcp`, `code-review-rcp`, `docs-review-rcp`, or `technical-docs-rcp`, also include `--skill validate-finding`.
 
 ## License
 
