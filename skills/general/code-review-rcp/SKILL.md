@@ -4,7 +4,7 @@ description: Review a PR, branch, or diff for standards, spec, and risk; verify 
 disable-model-invocation: true
 ---
 
-Review a pinned revision along three independent axes, then verify findings. Follow-up reviews use the previous review record to check fixes and affected behavior. Leave implementation unchanged unless the user asks for fixes; save only the review record by default.
+Review a pinned revision along three axes (Standards, Spec, Risk) and report only verified findings. Follow-up reviews use the previous review record to check fixes. Leave implementation unchanged unless the user asks for fixes; the only file you write is the review record.
 
 ## The bar
 
@@ -14,77 +14,68 @@ A finding has a concrete cost: a bug, a security or data-loss issue, a missing o
 
 ### 1. Pin the revision and choose the mode
 
-Resolve the comparison from the user's PR link, branch, SHA, tag, `main`, `HEAD~5`, or matching prior review record. Ask only when neither establishes the target and base.
+Resolve target and base from what the user gave (PR link, branch, SHA, tag, prior record); ask only when neither is clear. A PR is reviewed at its head commit against `origin/<baseRefName>` (`gh pr view <ref> --json headRefName,headRefOid,baseRefName,body`); when uncommitted work blocks a checkout, ask or use a `git worktree`.
 
-For a PR link, put the PR's code at `HEAD`:
+Pin base, head, and merge-base to SHAs and use only those in every diff, log, and brief; read surrounding code at that revision. Uncommitted changes are covered only when the user includes them, as a recorded snapshot.
 
-- `gh pr view <ref> --json headRefName,headRefOid,baseRefName,body`.
-- If `HEAD` isn't `headRefOid`: clean tree → `gh pr checkout <ref>`; uncommitted work → ask, or review from a `git worktree`.
-- `git fetch origin <baseRefName>`; the fixed point is `origin/<baseRefName>`.
+Look for a matching review record, supplied by the user or under `.scratch/code-review/`, matched by repository and PR or branch identity. **Initial review** covers the full diff. **Follow-up** applies when the user asks to check fixes or continue a recorded review: read [references/follow-up.md](references/follow-up.md). With no usable record, say so and do an initial review.
 
-Resolve the fixed point and head to commit SHAs, then record their merge-base SHA. Use those immutable values in every diff, log, and sub-agent brief: `git diff <merge-base-sha> <head-sha>` and `git log <base-sha>..<head-sha> --oneline`. Read surrounding files from that same revision, using an isolated checkout when the working tree differs. If the user includes uncommitted changes, capture a stable snapshot and identify it in the record; a HEAD-only review does not cover them.
-
-Find a matching review record supplied by the user or under `.scratch/code-review/`. Match repository and PR or branch identity, not just a filename. **Initial review** covers the full diff. **Follow-up** applies when the user asks to check fixes or continue a recorded review; read [references/follow-up.md](references/follow-up.md). An explicit fresh review covers the full diff while retaining earlier decisions as context. With no usable record, state that limitation and perform an initial review.
-
-Done when the snapshot, comparison, and mode are recorded. An empty initial diff ends with no changed code to review; an unchanged follow-up can still verify outstanding findings.
+Done when the SHAs and mode are recorded.
 
 ### 2. Gather spec and standards
 
-**Spec** — start with the user-supplied source, then the PR body and linked issue, issue refs in commit messages (`gh issue view <ref> --comments`, or `docs/agents/issue-tracker.md` if present), and matching specs under `docs/`, `specs/`, or `.scratch/`. Include later decisions and explicit exclusions. Record the acceptance criteria and sources; surface conflicting requirements as questions rather than silently choosing one. None found → ask; if there is none, skip the Spec axis.
+**Spec**: the user's source, the PR body and linked issues (`gh issue view <ref> --comments`, or `docs/agents/issue-tracker.md` if present), issue refs in commits, and matching specs under `docs/`, `specs/`, or `.scratch/`. Record acceptance criteria, later decisions, and exclusions; raise conflicting requirements as questions. None found → ask; if none exists, skip the Spec axis.
 
-**Standards** — `CODING_STANDARDS.md`, `CONTRIBUTING.md`, `AGENTS.md` / `CLAUDE.md`, `docs/adr/`, and lint/format config (to know what tooling already enforces).
+**Standards**: `CODING_STANDARDS.md`, `CONTRIBUTING.md`, `AGENTS.md` / `CLAUDE.md`, `docs/adr/`, and lint/format config (what tooling already enforces).
 
-Use the user's blocking threshold; otherwise P0/P1 findings block. Done when the reviewers share the same contracts, exclusions, threshold, and known verification limits.
+Blocking threshold: the user's, else P0/P1.
 
-### 3. Run the three axes in parallel
+### 3. Review
 
-For an initial review, dispatch one sub-agent per applicable axis, in parallel as capacity allows. Each gets the pinned checkout, diff command, commit list, contracts, prior decisions, and its axis below. On a large diff, split Risk by affected subsystem. For follow-up scope, use the reference above.
+Size the diff with `git diff --stat`:
 
-Every brief includes the bar verbatim and ends: "Read surrounding code and affected callers. For each candidate, give file:line, trigger, expected versus actual behavior, supporting contract, and a reproduction or complete source trace. Explain how this change introduces or exposes it. For recommendations, show the concrete maintenance cost. Keep each finding concise; retain material evidence and list coverage or verification gaps. Zero findings is valid."
+- **Inline**: up to ~300 changed lines in one subsystem. Review it yourself, all three axes in one pass, classifying each candidate with [validate-finding](../validate-finding/SKILL.md) as you go.
+- **Sliced**: anything larger. Split by subsystem so each changed file belongs to one slice, and dispatch one sub-agent per slice in parallel, each applying all three axes. Where the harness lets you choose, slice reviewers can run on a faster model; step 4 re-checks what blocks.
 
-**Standards** — pass the standards files. Report breaches of documented rules (cite file and rule) and code smells, each only where it clears the bar. Label smells "possible <smell>" — only documented rules are hard violations. A documented standard that endorses a pattern suppresses the smell; skip tooling-covered nits.
+Each slice brief carries the SHAs and the slice's diff command, the contracts, exclusions, and prior decisions, the bar and the axes below verbatim, and ends: "Read surrounding code and affected callers. Classify each candidate with the validate-finding skill and return only `bug` and `recommendation` findings that clear the bar, each with file:line, trigger, expected versus actual, the contract it breaks, evidence (reproduction or complete source trace), how this change introduces or exposes it, and confidence. Also return coverage gaps, leads that cross into other slices, and any `possible issue` with the fact that would settle it."
 
-**Spec** — pass the spec; quote the spec line per finding.
+**Standards**: breaches of documented rules (cite file and rule) and code smells labelled "possible <smell>". A documented standard that endorses the pattern suppresses the smell; skip what tooling enforces.
 
-- Missing requirements grounded in the spec, a documented contract, or established behavior. Error handling, tests, docs, telemetry, and caller updates count only when required by such evidence or a demonstrated failure; missing artifacts alone do not establish a defect.
-- Wrong implementation — looks done, behaves differently from the spec.
-- Scope creep — unrequested behaviour, config, refactors, or deps that add risk or maintenance burden; say whether to split each out.
+**Spec**: quote the spec line per finding.
+
+- Missing requirements grounded in the spec, a documented contract, or established behaviour. A missing test, doc, or log line is a defect only when such evidence requires it.
+- Wrong implementation: looks done, behaves differently from the spec.
+- Scope creep that adds risk or maintenance burden; say whether to split it out.
 
 **Risk**
 
-- **Correctness** — hidden bugs the happy path and tests miss; edge cases (empty/huge input, falsy values, boundaries, unicode, timezones, repeat/concurrent calls, partial failure); assumptions the system doesn't guarantee (nullability, ordering, uniqueness, freshness, unchecked casts, invariants enforced at only some call sites).
-- **Security** — untrusted input reaching a query, command, path, template, or deserializer; missing authn/authz on new surface, especially object-level; secrets or PII in code, logs, or responses (report location and type, never the value); weak crypto, open redirects, missing rate limits; deps added or bumped in the diff.
-- **Architecture** — changes that fight the codebase's shape (layer leaks, new coupling or cycles, drifting duplicated state, an invented pattern where one exists); compat breaks for callers or stored data.
+- **Correctness**: edge cases, assumptions the system doesn't guarantee, invariants enforced at only some call sites.
+- **Security**: untrusted input reaching a sink, missing object-level authz on new surface, secrets or PII (location and type, never the value), deps added or bumped.
+- **Architecture**: layer leaks, new coupling, an invented pattern where one exists, compat breaks for callers or stored data.
 
-Done when each applicable axis returns findings or explicitly reports no findings, plus any material coverage gaps.
+Done when every slice is reviewed on every applicable axis, returning findings or an explicit none, plus coverage gaps.
 
-### 4. Verify every finding
+### 4. Verify
 
-Pool the axes and merge by root cause. Confirm each against the pinned code, surrounding paths, and contracts. Check disconfirming evidence: guards, validation, callers, and tests that actually exercise the claimed failure. Where safe and useful, run a targeted check and record its command and result; a complete static trace can suffice. An unrelated passing suite does not disprove a finding.
+Merge findings by root cause and chase cross-slice leads. Reviewers have already classified their findings; re-check yourself only P0/P1 candidates, low-confidence findings, and claims spanning slices, against the pinned code, the base revision when causation is unclear, and disconfirming guards, callers, and tests. A configured tool alone doesn't prove a correctness or security issue is prevented.
 
-Classify with [validate-finding](../validate-finding/SKILL.md). Only `bug` and `recommendation` findings that clear the bar survive. Compare with the base revision when causation is uncertain. Existing defects count here when the change makes them reachable or materially worse; otherwise separate a serious incidental discovery from this review's findings and completion gate.
+Pre-existing defects count when the change makes them reachable or materially worse; report any other serious incidental discovery separately, outside the gate. An unsettled `possible issue` stays a verification gap naming the missing fact. Done when every finding has evidence and a disposition.
 
-An unsettled `possible issue` stays a verification gap with the missing fact named. Drop false positives, nits already covered by tooling, and below-bar recommendations. A configured tool alone is not proof that a correctness or security issue is prevented. Done when each candidate has evidence and a disposition.
+### 5. Report
 
-### 5. Report severity and completion
+Rank confirmed defects by impact and reachability: **P0** critical, **P1** fix before merge, **P2** moderate, **P3** low. Severity is separate from classification. List maintainability recommendations separately as optional improvements. Each finding: stable ID, severity, claim, `file:line`, trigger and impact, evidence, suggested fix. Follow-ups report status changes and new findings only.
 
-List confirmed defects by impact and reachability: **P0** critical, immediate action; **P1** high impact, fix before merge; **P2** moderate impact; **P3** low impact. Classification and severity are separate: being a bug does not automatically make it a blocker. List concrete maintainability recommendations separately as optional improvements.
+Gate: **met** (no open blocking finding, required checks pass, no material gap), **not met** (open findings at the threshold), or **inconclusive** (missing evidence could change the decision). Deferral alone doesn't resolve a blocker; user-approved exceptions stay explicit.
 
-Each finding includes a stable ID, severity, claim, `file:line`, trigger and impact, evidence, and a suggested fix. Follow-ups report status changes and new findings without repeating unchanged explanations.
-
-State the gate outcome: **met**, **not met** (open findings at the blocking threshold), or **inconclusive** (material missing evidence or required checks could change the decision). The gate is met when blocking findings are resolved, relevant required verification passes, and no material verification gap remains. Disclose lesser uncertainties and deferred or lower-severity findings. Deferral alone does not resolve a blocker; any user-approved exception remains explicit. A finished review can have an unmet gate.
-
-End with counts by severity, optional improvements, false positives dropped, coverage limits, and "no spec" when applicable. Stop after the scoped review and verification; another broad search needs a scope change, new evidence, or a user request. A met gate describes this revision and scope, not proof of bug-free code.
+End with counts by severity, optional improvements, false positives dropped, coverage limits, and "no spec" when applicable. Stop after this scoped pass.
 
 ### 6. Save the review record
 
-Update the matching record, or create `.scratch/code-review/<target>.md` using a filesystem-safe PR or branch identifier. Link it in the final report so another session can load it. If the user requires no writes, provide the record inline instead. Keep it out of commits unless requested.
+Update the matching record or create `.scratch/code-review/<target>.md` (filesystem-safe PR or branch id), link it in the report, and keep it out of commits. If the user forbids writes, give it inline. Keep it compact and current:
 
-Keep a compact current record containing:
+- Target identity, base/head/merge-base SHAs or snapshot, mode and covered scope.
+- Spec and standards sources, acceptance criteria, exclusions, blocking threshold, approved exceptions.
+- Findings with stable IDs (`R1`, `R2`, …; new IDs only for new root causes): root cause, classification, severity, location, evidence, status (open, resolved, rejected, deferred), and who decided and why for any acceptance or deferral.
+- Checks run and results, verification gaps, gate outcome, and the revision each resolution was verified against.
 
-- Repository and target identity, base/head/merge-base SHAs or snapshot identity, review mode and covered scope.
-- Spec and standards sources, acceptance criteria, exclusions, blocking threshold, and any approved exceptions.
-- Stable finding IDs (`R1`, `R2`, ...), root cause, classification, severity, location, evidence, and status: open, resolved, rejected, or deferred. Record the reason and who made any acceptance or deferral decision; assign new IDs only to new root causes.
-- Checks and results, verification gaps, gate outcome, and the revision against which each resolution was verified.
-
-Preserve enough rejected and resolved evidence to avoid reopening settled claims without cause; omit discarded nits. Done when the record matches the reported revision and decisions.
+Keep enough rejected and resolved evidence that settled claims aren't reopened without cause; omit nits.
