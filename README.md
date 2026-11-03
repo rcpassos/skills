@@ -12,6 +12,7 @@ Skills are grouped by category under `skills/<category>/<name>/`.
 | [`code-review-rcp`](skills/general/code-review-rcp/SKILL.md) | Verified review of a PR, branch, or diff across Standards, Spec, and Risk, with severity, saved decisions, and follow-up checks of fixes. |
 | [`docs-review-rcp`](skills/general/docs-review-rcp/SKILL.md) | Read-only documentation review: requirements, architecture, decisions, technical claims, Word fidelity, and diagrams. |
 | [`issue-check-rcp`](skills/general/issue-check-rcp/SKILL.md) | Validate a GitHub issue before work starts: is it valid, is it useful, what's the risk, how big is it. |
+| [`technical-docs-rcp`](skills/general/technical-docs-rcp/SKILL.md) | Write, revise, or validate technical documentation against the reader's goal and available sources. |
 | [`validate-finding`](skills/general/validate-finding/SKILL.md) | Classify a suspected issue as bug, possible issue, false-positive, or recommendation, backed by evidence. Used by `audit-rcp`, `code-review-rcp`, and `docs-review-rcp` to verify findings; also usable on its own. |
 
 ### WordPress
