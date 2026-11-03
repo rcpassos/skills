@@ -20,7 +20,7 @@ For validation, follow steps 1–2, then **Review** below. For writing or revisi
 
 4. **Write the document.** Lead with the task or fact the reader needs. Use descriptive headings and include only sections that serve the document's purpose. For procedures, include ordered steps, copyable examples, expected results, and recovery from likely failures. For reference material, include exact inputs, defaults, constraints, and outputs where relevant. For design proposals, identify decisions, tradeoffs, and open questions.
 
-5. **Verify and deliver.** Walk through the document as its intended reader. Check examples, paths, links, and consistency against the sources; run examples when practical and authorized. Confirm the requested scope is covered and check every language rule below. Rewrite violations before delivery, preserving technical meaning and necessary detail. Edit the requested files, or return the document directly when no destination is established. Briefly report what was produced, what was verified, and any unresolved facts or unrun examples.
+5. **Verify and deliver.** Walk through the document as its intended reader. Check examples, paths, links, and consistency against the sources; run examples when practical and authorized. If a check reveals a suspected defect, read [validate-finding](../validate-finding/SKILL.md) and apply its rubric before correcting or reporting it. Confirm the requested scope is covered and check every language rule below. Rewrite violations before delivery, preserving technical meaning and necessary detail. Edit the requested files, or return the document directly when no destination is established. Briefly report what was produced, what was verified, and any unresolved facts or unrun examples.
 
 ## Language standard
 
@@ -43,8 +43,10 @@ Examples (assuming the stated behavior is verified):
 
 ## Review
 
-Read the full in-scope document. Check accuracy, required coverage, prerequisites, steps, examples, expected results, recovery, and links where they support the reader's goal. Use the **Language standard** to spot wording that could change the reader's understanding or actions. Check each candidate against the surrounding text, relevant linked guidance, and authoritative sources.
+Read the full in-scope document. Check accuracy, required coverage, prerequisites, steps, examples, expected results, recovery, and links where they support the reader's goal. Use the **Language standard** to spot wording that could change the reader's understanding or actions.
 
-Report a finding only when you can cite the location, show the defect with evidence, and explain either its practical consequence for the intended reader or the explicit user or project requirement it violates. For an ambiguity, show the plausible readings and how they would lead to different actions or conclusions. A preference for different wording, punctuation, or structure belongs in editorial suggestions, included separately only when requested.
+Read [validate-finding](../validate-finding/SKILL.md) and apply its rubric to every candidate before reporting. Establish the expected meaning from the relevant requirement, contract, or authoritative source. Check the surrounding text and linked guidance for qualifications or decisions that could refute the claim. Report confirmed defects as findings, record material unresolved candidates under verification limits with the evidence needed to resolve them, and discard false positives.
+
+Report a finding only when you can cite the location, show the defect with evidence, and explain either its practical consequence for the intended reader or the explicit user or project requirement it violates. Confirm an ambiguity by showing plausible readings that lead to different actions or conclusions, even if the intended reading is unresolved. Include recommendations separately as editorial suggestions only when requested.
 
 Rank confirmed findings by reader impact. Group repeated instances and give the smallest correction for each problem. List missing sources or unrun examples separately as verification limits when they affect the verdict. When the relevant checks are complete, stop. If no candidate meets the reporting threshold, say “No findings” for the scope verified. Edit the document only when changes were requested.
