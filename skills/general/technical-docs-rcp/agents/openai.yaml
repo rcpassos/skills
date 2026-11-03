@@ -1,0 +1,5 @@
+interface:
+  display_name: "Technical Docs (RCP)"
+  short_description: "Write, revise, or validate technical documentation"
+policy:
+  allow_implicit_invocation: false
